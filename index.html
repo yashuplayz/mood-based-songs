@@ -1,13 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mood-Based Songs</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js" defer></script>
+  <script src="auth.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
   <h1>Mood-Based Songs 🎵</h1>
-  <button id="login-btn">Login with Spotify</button>
-  <script src="config.js"></script>
-  <script src="auth.js" defer></script>
+
+  <div id="login-section">
+    <button id="login-btn">Login with Spotify</button>
+  </div>
+
+  <div id="app-section" style="display:none;">
+    <div id="user-info"></div>
+
+    <h2>Select Your Mood:</h2>
+    <div id="mood-buttons">
+      <button data-mood="happy">Happy</button>
+      <button data-mood="sad">Sad</button>
+      <button data-mood="chill">Chill</button>
+    </div>
+
+    <h2>Songs:</h2>
+    <div id="songs-list"></div>
+  </div>
+
 </body>
 </html>
