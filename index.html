@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spotify Mood Player</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>🎵 Mood-Based Spotify Player</h1>
+  <button onclick="login()">Log in with Spotify</button>
+
+  <div id="mood-buttons" style="display: none;">
+    <h3>Select your mood:</h3>
+    <button onclick="setMood('happy')">Happy</button>
+    <button onclick="setMood('sad')">Sad</button>
+    <button onclick="setMood('chill')">Chill</button>
+  </div>
+
+  <div id="player-status"></div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
