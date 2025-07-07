@@ -15,25 +15,55 @@ async function getUserProfile() {
 }
 
 async function getRecommendations(mood) {
-  const seedGenres = {
-    happy: 'pop',
-    sad: 'acoustic',
-    chill: 'lofi',
+  const token = localStorage.getItem('spotify_access_token');
+
+  const moodOptions = {
+    happy: {
+      genre: 'pop',
+      valence: 0.9,
+      energy: 0.8
+    },
+    sad: {
+      genre: 'acoustic',
+      valence: 0.2,
+      energy: 0.3
+    },
+    chill: {
+      genre: 'chill',
+      valence: 0.5,
+      energy: 0.2
+    }
   };
+
+  const config = moodOptions[mood];
+  if (!config) {
+    console.error('Unknown mood:', mood);
+    return [];
+  }
 
   const params = new URLSearchParams({
     limit: 10,
-    seed_genres: seedGenres[mood] || 'pop',
+    seed_genres: config.genre,
+    target_valence: config.valence,
+    target_energy: config.energy
   });
 
-  const res = await fetch(`https://api.spotify.com/v1/recommendations?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+  const url = `https://api.spotify.com/v1/recommendations?${params.toString()}`;
+  console.log('Fetching:', url);
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
   });
 
   if (!res.ok) {
-    songsList.innerHTML = `<p>Failed to get recommendations. Try logging in again.</p>`;
+    const errorText = await res.text();
+    console.error('Spotify API Error:', res.status, errorText);
+    songsList.innerHTML = `<p>Failed to get recommendations. (${res.status})</p>`;
     return [];
   }
+
   const data = await res.json();
   return data.tracks;
 }
