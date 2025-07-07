@@ -1,5 +1,4 @@
-// auth.js
-
+// --- PKCE helpers ---
 function generateRandomString(length) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -21,6 +20,7 @@ async function generateCodeChallenge(codeVerifier) {
   return base64encode(digest);
 }
 
+// --- Redirect user to Spotify login ---
 async function redirectToSpotifyLogin() {
   const codeVerifier = generateRandomString(128);
   const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -40,3 +40,51 @@ async function redirectToSpotifyLogin() {
 }
 
 document.getElementById('login-btn').addEventListener('click', redirectToSpotifyLogin);
+
+// --- After redirect: exchange code for tokens ---
+async function fetchAccessToken() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (!code) return; // no code in URL
+
+  const codeVerifier = localStorage.getItem('code_verifier');
+  if (!codeVerifier) {
+    console.error('No code verifier found');
+    return;
+  }
+
+  const body = new URLSearchParams({
+    client_id: CLIENT_ID,
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: REDIRECT_URI,
+    code_verifier: codeVerifier,
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Failed to get token:', errorText);
+    return;
+  }
+
+  const data = await res.json();
+  localStorage.setItem('spotify_access_token', data.access_token);
+  localStorage.setItem('spotify_refresh_token', data.refresh_token);
+
+  // Clear URL to avoid multiple exchanges
+  window.history.replaceState({}, document.title, REDIRECT_URI);
+
+  // Reload app to initialize with token
+  window.location.reload();
+}
+
+// Call on page load to handle redirect
+window.onload = fetchAccessToken;
