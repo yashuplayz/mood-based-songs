@@ -7,53 +7,42 @@ const moodButtons = document.querySelectorAll('#mood-buttons button');
 let accessToken = localStorage.getItem('spotify_access_token');
 
 async function getUserProfile() {
+  if (!accessToken) throw new Error('No access token');
+
   const res = await fetch('https://api.spotify.com/v1/me', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error('Failed to get user profile');
-  return await res.json();
-}
-
-async function getRecommendations(mood) {
-  const moodConfig = {
-    happy: {
-      genre: 'pop',
-      valence: 0.9,
-      energy: 0.8
-    },
-    sad: {
-      genre: 'acoustic',
-      valence: 0.2,
-      energy: 0.3
-    },
-    chill: {
-      genre: 'chill',
-      valence: 0.5,
-      energy: 0.2
-    }
-  };
-
-  const config = moodConfig[mood];
-  if (!config) {
-    console.error('Invalid mood:', mood);
-    return [];
-  }
-
-  const params = new URLSearchParams({
-    limit: 10,
-    seed_genres: config.genre,
-    target_valence: config.valence,
-    target_energy: config.energy
-  });
-
-  const res = await fetch(`https://api.spotify.com/v1/recommendations?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    console.error('Error fetching recommendations:', res.status, errorText);
-    songsList.innerHTML = `<p>Failed to get recommendations. (${res.status})</p>`;
+    console.error('User profile fetch error:', res.status, res.statusText);
+    throw new Error('Failed to get user profile');
+  }
+  return await res.json();
+}
+
+async function getRecommendations(mood) {
+  if (!accessToken) throw new Error('No access token');
+
+  const seedGenres = {
+    happy: 'pop',
+    sad: 'acoustic',
+    chill: 'lofi',
+  };
+
+  const params = new URLSearchParams({
+    limit: 10,
+    seed_genres: seedGenres[mood] || 'pop',
+    // Removed target_valence and target_energy to prevent 404
+  });
+
+  const url = `https://api.spotify.com/v1/recommendations?${params.toString()}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    console.error('Error fetching recommendations:', res.status, res.statusText);
+    songsList.innerHTML = `<p>Failed to get recommendations. Please login again.</p>`;
     return [];
   }
 
@@ -102,7 +91,7 @@ function initializePlayer(token) {
       });
 
       player.addListener('ready', ({ device_id }) => {
-        console.log('Ready with Device ID', device_id);
+        console.log('Spotify Player ready with Device ID', device_id);
         window.device_id = device_id;
         resolve(player);
       });
@@ -126,16 +115,19 @@ function initializePlayer(token) {
       player.connect();
     };
 
-    const script = document.createElement('script');
-    script.src = "https://sdk.scdn.co/spotify-player.js";
-    document.body.appendChild(script);
+    // Load the SDK script if not loaded yet
+    if (!document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
+      const script = document.createElement('script');
+      script.src = "https://sdk.scdn.co/spotify-player.js";
+      document.body.appendChild(script);
+    }
   });
 }
 
 async function playTrack(uri) {
   if (!window.device_id) {
     console.error('Device ID not set yet');
-    alert('Player is not ready yet. Please wait a moment and try again.');
+    alert('Player not ready. Please wait a moment and try again.');
     return;
   }
 
@@ -168,7 +160,8 @@ async function initApp() {
   try {
     const profile = await getUserProfile();
     userInfoDiv.innerHTML = `<p>Logged in as <strong>${profile.display_name}</strong></p>`;
-  } catch {
+  } catch (error) {
+    console.error('User profile fetch failed:', error);
     userInfoDiv.innerHTML = `<p>Failed to fetch user info. Try logging in again.</p>`;
     return;
   }
@@ -184,11 +177,17 @@ moodButtons.forEach(btn => {
   btn.addEventListener('click', async () => {
     songsList.innerHTML = '<p>Loading songs...</p>';
     const mood = btn.getAttribute('data-mood');
-    const tracks = await getRecommendations(mood);
-    renderSongs(tracks);
 
-    if (tracks.length > 0) {
-      playTrack(tracks[0].uri);
+    try {
+      const tracks = await getRecommendations(mood);
+      renderSongs(tracks);
+
+      if (tracks.length > 0) {
+        playTrack(tracks[0].uri);
+      }
+    } catch (error) {
+      console.error('Error fetching or playing tracks:', error);
+      songsList.innerHTML = '<p>Error loading songs. Please try again.</p>';
     }
   });
 });
