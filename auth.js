@@ -1,16 +1,16 @@
 // auth.js
 
 function generateRandomString(length) {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  for (let i = 0; i < length; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length));
+  for(let i=0; i<length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
 }
 
-function base64encode(str) {
-  return btoa(String.fromCharCode.apply(null, new Uint8Array(str)))
+function base64encode(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -27,16 +27,16 @@ async function redirectToSpotifyLogin() {
 
   localStorage.setItem('code_verifier', codeVerifier);
 
-  const args = new URLSearchParams({
-    response_type: 'code',
+  const params = new URLSearchParams({
     client_id: CLIENT_ID,
-    scope: SCOPES,
+    response_type: 'code',
     redirect_uri: REDIRECT_URI,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,
+    scope: SCOPES,
   });
 
-  window.location = 'https://accounts.spotify.com/authorize?' + args;
+  window.location = 'https://accounts.spotify.com/authorize?' + params.toString();
 }
 
 document.getElementById('login-btn').addEventListener('click', redirectToSpotifyLogin);
