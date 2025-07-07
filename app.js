@@ -15,9 +15,7 @@ async function getUserProfile() {
 }
 
 async function getRecommendations(mood) {
-  const token = localStorage.getItem('spotify_access_token');
-
-  const moodOptions = {
+  const moodConfig = {
     happy: {
       genre: 'pop',
       valence: 0.9,
@@ -35,9 +33,9 @@ async function getRecommendations(mood) {
     }
   };
 
-  const config = moodOptions[mood];
+  const config = moodConfig[mood];
   if (!config) {
-    console.error('Unknown mood:', mood);
+    console.error('Invalid mood:', mood);
     return [];
   }
 
@@ -48,18 +46,13 @@ async function getRecommendations(mood) {
     target_energy: config.energy
   });
 
-  const url = `https://api.spotify.com/v1/recommendations?${params.toString()}`;
-  console.log('Fetching:', url);
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+  const res = await fetch(`https://api.spotify.com/v1/recommendations?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('Spotify API Error:', res.status, errorText);
+    console.error('Error fetching recommendations:', res.status, errorText);
     songsList.innerHTML = `<p>Failed to get recommendations. (${res.status})</p>`;
     return [];
   }
@@ -99,7 +92,6 @@ function renderSongs(tracks) {
   });
 }
 
-// Initialize Spotify Player SDK
 function initializePlayer(token) {
   return new Promise((resolve, reject) => {
     window.onSpotifyWebPlaybackSDKReady = () => {
@@ -134,7 +126,6 @@ function initializePlayer(token) {
       player.connect();
     };
 
-    // Load SDK script
     const script = document.createElement('script');
     script.src = "https://sdk.scdn.co/spotify-player.js";
     document.body.appendChild(script);
