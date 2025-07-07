@@ -1,22 +1,16 @@
-// app.js
-
 const loginSection = document.getElementById('login-section');
 const appSection = document.getElementById('app-section');
 const userInfoDiv = document.getElementById('user-info');
 const songsList = document.getElementById('songs-list');
 const moodButtons = document.querySelectorAll('#mood-buttons button');
 
-let accessToken = localStorage.getItem('access_token');
-
-function formatArtists(artists) {
-  return artists.map(a => a.name).join(', ');
-}
+let accessToken = localStorage.getItem('spotify_access_token');
 
 async function getUserProfile() {
   const res = await fetch('https://api.spotify.com/v1/me', {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if(!res.ok) throw new Error('Failed to get user profile');
+  if (!res.ok) throw new Error('Failed to get user profile');
   return await res.json();
 }
 
@@ -36,7 +30,7 @@ async function getRecommendations(mood) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if(!res.ok) {
+  if (!res.ok) {
     songsList.innerHTML = `<p>Failed to get recommendations. Try logging in again.</p>`;
     return [];
   }
@@ -44,8 +38,12 @@ async function getRecommendations(mood) {
   return data.tracks;
 }
 
+function formatArtists(artists) {
+  return artists.map(a => a.name).join(', ');
+}
+
 function renderSongs(tracks) {
-  if(tracks.length === 0) {
+  if (tracks.length === 0) {
     songsList.innerHTML = '<p>No songs found for this mood.</p>';
     return;
   }
@@ -60,16 +58,84 @@ function renderSongs(tracks) {
       <div class="song-info">
         <div class="song-title">${track.name}</div>
         <div class="song-artists">${formatArtists(track.artists)}</div>
-        <audio controls src="${track.preview_url || ''}"></audio>
       </div>
     `;
+
+    songDiv.addEventListener('click', () => {
+      playTrack(track.uri);
+    });
 
     songsList.appendChild(songDiv);
   });
 }
 
+// Initialize Spotify Player SDK
+function initializePlayer(token) {
+  return new Promise((resolve, reject) => {
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const player = new Spotify.Player({
+        name: 'Mood Player',
+        getOAuthToken: cb => cb(token),
+        volume: 0.8,
+      });
+
+      player.addListener('ready', ({ device_id }) => {
+        console.log('Ready with Device ID', device_id);
+        window.device_id = device_id;
+        resolve(player);
+      });
+
+      player.addListener('initialization_error', ({ message }) => {
+        console.error('Initialization error:', message);
+        reject(message);
+      });
+      player.addListener('authentication_error', ({ message }) => {
+        console.error('Authentication error:', message);
+        reject(message);
+      });
+      player.addListener('account_error', ({ message }) => {
+        console.error('Account error:', message);
+        reject(message);
+      });
+      player.addListener('playback_error', ({ message }) => {
+        console.error('Playback error:', message);
+      });
+
+      player.connect();
+    };
+
+    // Load SDK script
+    const script = document.createElement('script');
+    script.src = "https://sdk.scdn.co/spotify-player.js";
+    document.body.appendChild(script);
+  });
+}
+
+async function playTrack(uri) {
+  if (!window.device_id) {
+    console.error('Device ID not set yet');
+    alert('Player is not ready yet. Please wait a moment and try again.');
+    return;
+  }
+
+  const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${window.device_id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ uris: [uri] }),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    console.error('Error playing track:', error);
+    alert('Failed to play track. Please make sure you have a Spotify Premium account.');
+  }
+}
+
 async function initApp() {
-  if(!accessToken) {
+  if (!accessToken) {
     loginSection.style.display = 'block';
     appSection.style.display = 'none';
     return;
@@ -83,6 +149,13 @@ async function initApp() {
     userInfoDiv.innerHTML = `<p>Logged in as <strong>${profile.display_name}</strong></p>`;
   } catch {
     userInfoDiv.innerHTML = `<p>Failed to fetch user info. Try logging in again.</p>`;
+    return;
+  }
+
+  try {
+    await initializePlayer(accessToken);
+  } catch (e) {
+    console.error('Failed to initialize player:', e);
   }
 }
 
@@ -92,6 +165,10 @@ moodButtons.forEach(btn => {
     const mood = btn.getAttribute('data-mood');
     const tracks = await getRecommendations(mood);
     renderSongs(tracks);
+
+    if (tracks.length > 0) {
+      playTrack(tracks[0].uri);
+    }
   });
 });
 
