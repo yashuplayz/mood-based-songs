@@ -68,43 +68,44 @@ async function getUserProfile() {
 async function getRecommendations(mood) {
   await ensureValidToken();
 
+  // Valid genres list (subset)
   const seedGenres = {
     happy: 'pop',
     sad: 'acoustic',
     chill: 'ambient',
   };
 
+  // Get genre for mood or fallback
+  const genre = seedGenres[mood] || 'pop';
+
   const params = new URLSearchParams({
     limit: 10,
-    seed_genres: seedGenres[mood] || 'pop',
-    target_valence: mood === 'happy' ? '0.9' : '0.4',
-    target_energy: mood === 'happy' ? '0.8' : '0.5'
+    seed_genres: genre,
+    // Remove target_valence and target_energy to simplify and avoid errors
   });
-
-  const res = await fetch(`https://api.spotify.com/v1/recommendations?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!res.ok) {
-    console.error('❌ Error fetching recommendations:', res.status, res.statusText);
-    try {
-      const error = await res.text(); // safer than json()
-      console.error('Error response:', error);
-    } catch (e) {
-      console.error('Failed to read error body');
-    }
-    songsList.innerHTML = `<p>Failed to get songs. (Status: ${res.status})</p>`;
-    return [];
-  }
 
   try {
+    const res = await fetch(`https://api.spotify.com/v1/recommendations?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('❌ Error fetching recommendations:', res.status);
+      console.error('Error response:', errorText);
+      songsList.innerHTML = `<p>Failed to get recommendations. Please try again.</p>`;
+      return [];
+    }
+
     const data = await res.json();
-    return data.tracks || [];
-  } catch (e) {
-    console.error('Failed to parse JSON:', e);
+    return data.tracks;
+  } catch (err) {
+    console.error('Fetch error:', err);
+    songsList.innerHTML = `<p>Network error. Please check your connection.</p>`;
     return [];
   }
 }
+
 
 function formatArtists(artists) {
   return artists.map(a => a.name).join(', ');
