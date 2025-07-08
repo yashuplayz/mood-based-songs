@@ -1,4 +1,5 @@
-const clientId = 'f5567173ea2343d5867eb33eae459285'; //
+const clientId = 'f5567173ea2343d5867eb33eae459285';
+
 const loginSection = document.getElementById('login-section');
 const appSection = document.getElementById('app-section');
 const userInfoDiv = document.getElementById('user-info');
@@ -9,55 +10,58 @@ let accessToken = localStorage.getItem('spotify_access_token');
 let refreshToken = localStorage.getItem('spotify_refresh_token');
 let tokenTimestamp = localStorage.getItem('spotify_token_timestamp');
 
-// Helper to check if token is expired (60 minutes = 3600s)
 function isTokenExpired() {
   if (!tokenTimestamp) return true;
   const now = Date.now();
   const elapsed = (now - parseInt(tokenTimestamp, 10)) / 1000;
-  return elapsed > 3600; // 1 hour
+  return elapsed > 3600;
 }
 
-// Refresh token using PKCE flow
 async function refreshAccessToken() {
   const params = new URLSearchParams();
   params.append('grant_type', 'refresh_token');
   params.append('refresh_token', refreshToken);
   params.append('client_id', clientId);
 
-  const res = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params
-  });
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.access_token) {
-    accessToken = data.access_token;
-    localStorage.setItem('spotify_access_token', accessToken);
-    localStorage.setItem('spotify_token_timestamp', Date.now().toString());
-    console.log('✅ Access token refreshed.');
-  } else {
-    console.error('❌ Failed to refresh token:', data);
-    logout(); // fallback
+    if (data.access_token) {
+      accessToken = data.access_token;
+      localStorage.setItem('spotify_access_token', accessToken);
+      localStorage.setItem('spotify_token_timestamp', Date.now().toString());
+      console.log('✅ Access token refreshed');
+    } else {
+      console.error('❌ Failed to refresh token:', data);
+      logout();
+    }
+  } catch (err) {
+    console.error('❌ Token refresh error:', err);
+    logout();
   }
 }
 
-// Call before each fetch to ensure valid token
 async function ensureValidToken() {
   if (!accessToken || isTokenExpired()) {
-    console.warn('⚠️ Access token expired or missing. Refreshing...');
+    console.warn('⚠️ Token expired or missing, refreshing...');
     await refreshAccessToken();
   }
 }
 
 async function getUserProfile() {
   await ensureValidToken();
-
   const res = await fetch('https://api.spotify.com/v1/me', {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+
   if (!res.ok) throw new Error('Failed to get user profile');
+
   return await res.json();
 }
 
@@ -73,8 +77,8 @@ async function getRecommendations(mood) {
   const params = new URLSearchParams({
     limit: 10,
     seed_genres: seedGenres[mood] || 'pop',
-    target_valence: '0.9',
-    target_energy: '0.8'
+    target_valence: mood === 'happy' ? '0.9' : '0.4',
+    target_energy: mood === 'happy' ? '0.8' : '0.5'
   });
 
   const res = await fetch(`https://api.spotify.com/v1/recommendations?${params}`, {
@@ -82,13 +86,24 @@ async function getRecommendations(mood) {
   });
 
   if (!res.ok) {
-    console.error('Error fetching recommendations:', res.status, await res.json());
-    songsList.innerHTML = `<p>Failed to get recommendations. Try logging in again.</p>`;
+    console.error('❌ Error fetching recommendations:', res.status, res.statusText);
+    try {
+      const error = await res.text(); // safer than json()
+      console.error('Error response:', error);
+    } catch (e) {
+      console.error('Failed to read error body');
+    }
+    songsList.innerHTML = `<p>Failed to get songs. (Status: ${res.status})</p>`;
     return [];
   }
 
-  const data = await res.json();
-  return data.tracks;
+  try {
+    const data = await res.json();
+    return data.tracks || [];
+  } catch (e) {
+    console.error('Failed to parse JSON:', e);
+    return [];
+  }
 }
 
 function formatArtists(artists) {
@@ -96,7 +111,7 @@ function formatArtists(artists) {
 }
 
 function renderSongs(tracks) {
-  if (tracks.length === 0) {
+  if (!tracks || tracks.length === 0) {
     songsList.innerHTML = '<p>No songs found for this mood.</p>';
     return;
   }
@@ -114,9 +129,7 @@ function renderSongs(tracks) {
       </div>
     `;
 
-    songDiv.addEventListener('click', () => {
-      playTrack(track.uri);
-    });
+    songDiv.addEventListener('click', () => playTrack(track.uri));
 
     songsList.appendChild(songDiv);
   });
@@ -132,7 +145,7 @@ function initializePlayer(token) {
       });
 
       player.addListener('ready', ({ device_id }) => {
-        console.log('✅ Ready with Device ID', device_id);
+        console.log('✅ Player ready. Device ID:', device_id);
         window.device_id = device_id;
         resolve(player);
       });
@@ -155,7 +168,7 @@ async function playTrack(uri) {
   await ensureValidToken();
 
   if (!window.device_id) {
-    alert('Player not ready yet. Please wait.');
+    alert('Player is not ready yet. Please wait.');
     return;
   }
 
@@ -169,8 +182,9 @@ async function playTrack(uri) {
   });
 
   if (!res.ok) {
-    console.error('Failed to play track:', await res.json());
-    alert('Could not play track. Are you using a Spotify Premium account?');
+    const errorText = await res.text();
+    console.error('❌ Could not play track:', errorText);
+    alert('Failed to play track. Do you have Spotify Premium?');
   }
 }
 
@@ -190,7 +204,8 @@ async function initApp() {
     await initializePlayer(accessToken);
   } catch (e) {
     console.error('Init error:', e);
-    userInfoDiv.innerHTML = `<p>Error initializing app. Try logging in again.</p>`;
+    userInfoDiv.innerHTML = `<p>Error initializing. Please log in again.</p>`;
+    logout();
   }
 }
 
