@@ -9,46 +9,61 @@
 
   <script src="config.js"></script>
   <script>
-   
-  async function fetchAccessToken(code) {
-    const codeVerifier = localStorage.getItem('code_verifier');
-    console.log('Code verifier:', codeVerifier);
+    async function fetchAccessToken(code) {
+      const codeVerifier = localStorage.getItem('code_verifier');
 
-    const body = new URLSearchParams({
-      client_id: CLIENT_ID,
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: codeVerifier,
-    });
+      if (!codeVerifier) {
+        document.body.innerHTML = '<p>Error: Missing code_verifier. Please try logging in again.</p>';
+        return;
+      }
 
-    try {
-      const response = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
+      const body = new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: codeVerifier,
       });
 
-      console.log('Token endpoint response status:', response.status);
-      const data = await response.json();
-      console.log('Token response JSON:', data);
+      try {
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: body.toString(),
+        });
 
-      if (response.ok && data.access_token) {
-        localStorage.setItem('spotify_access_token', data.access_token);
-        if (data.refresh_token) {
-          localStorage.setItem('spotify_refresh_token', data.refresh_token);
+        const data = await response.json();
+
+        if (data.access_token) {
+          localStorage.setItem('spotify_access_token', data.access_token);
+          localStorage.setItem('spotify_refresh_token', data.refresh_token || '');
+          localStorage.setItem('spotify_token_timestamp', Date.now().toString());
+
+          // Clear code verifier for security
+          localStorage.removeItem('code_verifier');
+
+          window.location.href = 'index.html'; // or your app's main page
+        } else {
+          console.error('Token error:', data);
+          document.body.innerHTML = `<p>❌ Error retrieving access token. Please try logging in again.</p>`;
         }
-        window.location.href = 'index.html';
-      } else {
-        document.body.innerHTML = `<p>Error retrieving access token: ${data.error || 'Unknown error'}</p>`;
+      } catch (err) {
+        console.error('Request failed:', err);
+        document.body.innerHTML = `<p>❌ Network error: ${err.message}</p>`;
       }
-    } catch (e) {
-      document.body.innerHTML = `<p>Network error: ${e.message}</p>`;
     }
-  }
 
-  
-</script>
+    // Run on load
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
 
+    if (code) {
+      fetchAccessToken(code);
+    } else {
+      document.body.innerHTML = '<p>❌ No authorization code found in URL. Please login again.</p>';
+    }
+  </script>
 </body>
 </html>
