@@ -71,7 +71,7 @@ async function getRecommendations(mood) {
   const seedGenres = {
     happy: 'pop',
     sad: 'acoustic',
-    chill: 'lo-fi',
+    chill: 'ambient',
   };
 
   const params = new URLSearchParams({
