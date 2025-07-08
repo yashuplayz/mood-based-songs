@@ -1,4 +1,4 @@
-const clientId = 'YOUR_SPOTIFY_CLIENT_ID'; // <-- Replace with your real client ID
+const clientId = 'f5567173ea2343d5867eb33eae459285'; //
 const loginSection = document.getElementById('login-section');
 const appSection = document.getElementById('app-section');
 const userInfoDiv = document.getElementById('user-info');
