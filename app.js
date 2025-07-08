@@ -230,7 +230,7 @@ moodButtons.forEach(btn => {
 window.addEventListener('load', initApp);
 const logoutBtn = document.getElementById('logout-btn');
 
-logoutBtn.addEventListener('click', () => {
+document.getElementById('logout-btn').addEventListener('click', () => {
   logout();
 });
 
@@ -238,6 +238,6 @@ function logout() {
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
   localStorage.removeItem('spotify_token_timestamp');
-  alert('You have been logged out. Please log in again.');
+  // Reload page to reset app state
   window.location.reload();
 }
